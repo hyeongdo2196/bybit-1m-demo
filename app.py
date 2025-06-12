@@ -29,6 +29,10 @@ def webhook():
         data = request.json
         print("Received data:", data)  # 수신된 데이터 로그 출력
 
+        # 데이터가 제대로 왔는지 확인
+        if not data:
+            return jsonify({'error': 'No data received'}), 400
+
         # 신호 (매수 또는 매도) 확인
         action = data.get('action')
         if action not in ['buy', 'sell']:
@@ -49,6 +53,8 @@ def webhook():
         params['timestamp'] = str(int(time.time() * 1000))
         params['signature'] = generate_signature(params)
 
+        print("Sending order with params:", params)  # 주문 파라미터 로그 출력
+
         # 비트겟 API 주문 요청
         order_url = f'{BASE_URL}/api/v1/order'
         response = requests.post(order_url, data=params)
@@ -60,6 +66,7 @@ def webhook():
             return jsonify({'error': response.json()}), 500
 
     except Exception as e:
+        print(f"Error: {str(e)}")  # 오류 로그 출력
         return jsonify({'error': str(e)}), 500
 
 # 기본 페이지 (테스트용)
