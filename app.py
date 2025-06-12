@@ -24,26 +24,19 @@ def generate_signature(params):
 def webhook():
     try:
         # 요청 헤더와 본문을 로그로 출력하여 확인
-        print("Headers:", request.headers)
-        print("Raw data:", request.data)
+        app.logger.info(f"Headers: {request.headers}")  # Flask 로그를 사용하여 정보 출력
+        app.logger.info(f"Raw data: {request.data}")  # 데이터 출력
 
         # JSON 데이터 받기
         data = request.json
 
-        # 요청 데이터가 파싱되지 않은 경우 수동으로 파싱
         if not data:
-            try:
-                data = json.loads(request.data)  # 수동으로 JSON 파싱
-            except json.JSONDecodeError:
-                return jsonify({'error': 'Invalid JSON format'}), 400
-
-        print("Received data:", data)  # 수신된 데이터 로그 출력
-
-        if not data:
+            app.logger.error("No data received")
             return jsonify({'error': 'No data received'}), 400
 
         action = data.get('action')
         if action not in ['buy', 'sell']:
+            app.logger.error(f"Invalid action received: {action}")
             return jsonify({'error': 'Invalid action'}), 400
 
         params = {
@@ -68,10 +61,11 @@ def webhook():
         if response.status_code == 200:
             return jsonify({'message': 'Order placed successfully'}), 200
         else:
+            app.logger.error(f"Bitget API Error: {response.text}")
             return jsonify({'error': response.json()}), 500
 
     except Exception as e:
-        print(f"Error: {str(e)}")  # 오류 로그 출력
+        app.logger.error(f"Error: {str(e)}")  # 오류를 Flask 로그에 기록
         return jsonify({'error': str(e)}), 500
 
 # 기본 페이지
@@ -81,4 +75,4 @@ def home():
 
 # 애플리케이션 실행
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)  # 외부에서 접근 가능하도록 host를 0.0.0.0으로 설정
+    app.run(debug=True, host='0.0.0.0', port=5000)
