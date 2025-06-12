@@ -1,28 +1,3 @@
-import requests
-from flask import Flask, request, jsonify
-import hmac
-import hashlib
-import time
-import json
-
-# Flask 애플리케이션 생성
-app = Flask(__name__)
-
-# 비트겟 API 키와 시크릿 키 (여기서는 더미 데이터로 설정, 실제 값을 입력해야 함)
-API_KEY = 'bg_9e4ab5c0a0c427406bba98473752269c'  # 비트겟에서 제공하는 실제 API Key를 여기에 입력하세요
-API_SECRET = '47a27700c5488fa7fddf508dac0f49472b8cad971087e58503a889d0c3bd3c59'  # 비트겟에서 제공하는 실제 API Secret을 여기에 입력하세요
-
-# 비트겟 API URL
-BASE_URL = 'https://api.bitget.com'
-
-# 서명 생성 함수
-def generate_signature(params):
-    """ 비트겟 API 요청 시 필요한 서명 생성 함수 """
-    query_string = '&'.join([f'{key}={value}' for key, value in sorted(params.items())])
-    signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
-    return signature
-
-# 웹훅 엔드포인트 설정
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
@@ -32,12 +7,12 @@ def webhook():
 
         # JSON 데이터 받기
         data = request.json
-
-        # 데이터가 제대로 파싱되지 않은 경우 수동으로 파싱
         if not data:
+            print("No JSON parsed. Attempting manual JSON parsing.")
             try:
                 data = json.loads(request.data)  # 수동으로 JSON 파싱
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                print(f"JSON Decode Error: {e}")
                 return jsonify({'error': 'Invalid JSON format'}), 400
 
         print("Received data:", data)  # 수신된 데이터 로그 출력
@@ -86,12 +61,3 @@ def webhook():
     except Exception as e:
         print(f"Error: {str(e)}")  # 오류 로그 출력
         return jsonify({'error': str(e)}), 500
-
-# 기본 페이지 (테스트용)
-@app.route('/')
-def home():
-    return "Flask TradingBot is running!"
-
-# 애플리케이션 실행
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)  # 외부에서 접근 가능하도록 host를 0.0.0.0으로 설정
