@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 import hmac
 import hashlib
 import time
+import json
 
 # Flask 애플리케이션 생성
 app = Flask(__name__)
@@ -25,11 +26,22 @@ def generate_signature(params):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        # TradingView에서 보낸 JSON 데이터 받기
+        # 먼저 Content-Type과 요청 본문을 확인
+        print("Headers:", request.headers)
+        print("Raw data:", request.data)
+
+        # JSON 데이터 받기
         data = request.json
-        
+
+        # 요청 데이터가 파싱되지 않은 경우 수동으로 파싱
+        if not data:
+            try:
+                data = json.loads(request.data)  # 수동으로 JSON 파싱
+            except json.JSONDecodeError:
+                return jsonify({'error': 'Invalid JSON format'}), 400
+
         print("Received data:", data)  # 수신된 데이터 로그 출력
-        
+
         # 데이터가 제대로 왔는지 확인
         if not data:
             return jsonify({'error': 'No data received'}), 400
