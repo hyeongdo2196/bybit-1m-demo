@@ -24,8 +24,8 @@ def generate_signature(params):
 def webhook():
     try:
         # 요청 헤더와 본문을 로그로 출력하여 확인
-        app.logger.info(f"Headers: {request.headers}")  # Flask 로그를 사용하여 정보 출력
-        app.logger.info(f"Raw data: {request.data}")  # 데이터 출력
+        app.logger.info(f"Headers: {request.headers}")
+        app.logger.info(f"Raw data: {request.data}")
 
         # JSON 데이터 받기
         data = request.json
@@ -34,7 +34,8 @@ def webhook():
             app.logger.error("No data received")
             return jsonify({'error': 'No data received'}), 400
 
-        action = data.get('action')
+        # 'action'을 'signal'로 수정
+        action = data.get('signal')  # 'action'을 'signal'로 수정
         if action not in ['buy', 'sell']:
             app.logger.error(f"Invalid action received: {action}")
             return jsonify({'error': 'Invalid action'}), 400
@@ -59,13 +60,14 @@ def webhook():
 
         # 비트겟 API 응답 처리
         if response.status_code == 200:
+            app.logger.info('Order placed successfully')
             return jsonify({'message': 'Order placed successfully'}), 200
         else:
             app.logger.error(f"Bitget API Error: {response.text}")
             return jsonify({'error': response.json()}), 500
 
     except Exception as e:
-        app.logger.error(f"Error: {str(e)}")  # 오류를 Flask 로그에 기록
+        app.logger.error(f"Error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # 기본 페이지
