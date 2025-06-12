@@ -27,8 +27,9 @@ def webhook():
     try:
         # TradingView에서 보낸 JSON 데이터 받기
         data = request.json
+        
         print("Received data:", data)  # 수신된 데이터 로그 출력
-
+        
         # 데이터가 제대로 왔는지 확인
         if not data:
             return jsonify({'error': 'No data received'}), 400
