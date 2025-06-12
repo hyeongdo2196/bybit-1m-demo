@@ -26,14 +26,14 @@ def generate_signature(params):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        # 먼저 Content-Type과 요청 본문을 확인
+        # 요청 헤더와 본문을 로그로 출력하여 확인
         print("Headers:", request.headers)
         print("Raw data:", request.data)
 
         # JSON 데이터 받기
         data = request.json
 
-        # 요청 데이터가 파싱되지 않은 경우 수동으로 파싱
+        # 데이터가 제대로 파싱되지 않은 경우 수동으로 파싱
         if not data:
             try:
                 data = json.loads(request.data)  # 수동으로 JSON 파싱
@@ -66,6 +66,8 @@ def webhook():
         params['timestamp'] = str(int(time.time() * 1000))
         params['signature'] = generate_signature(params)
 
+        # 서명과 파라미터 로그 출력
+        print("Generated signature:", params['signature'])
         print("Sending order with params:", params)  # 주문 파라미터 로그 출력
 
         # 비트겟 API 주문 요청
@@ -73,6 +75,9 @@ def webhook():
         response = requests.post(order_url, data=params)
 
         # 비트겟 API 응답 처리
+        print("Response status code:", response.status_code)
+        print("Response text:", response.text)
+
         if response.status_code == 200:
             return jsonify({'message': 'Order placed successfully'}), 200
         else:
