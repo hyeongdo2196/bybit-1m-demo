@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import time
 import json
+import requests
 
 # Flask 애플리케이션 객체 정의
 app = Flask(__name__)
@@ -13,6 +14,7 @@ API_SECRET = '47a27700c5488fa7fddf508dac0f49472b8cad971087e58503a889d0c3bd3c59'
 BASE_URL = 'https://api.bitget.com'
 
 def generate_signature(params):
+    """ 비트겟 API 요청 시 필요한 서명 생성 함수 """
     query_string = '&'.join([f'{key}={value}' for key, value in sorted(params.items())])
     signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
     return signature
@@ -21,7 +23,21 @@ def generate_signature(params):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
+        # 요청 헤더와 본문을 로그로 출력하여 확인
+        print("Headers:", request.headers)
+        print("Raw data:", request.data)
+
+        # JSON 데이터 받기
         data = request.json
+
+        # 요청 데이터가 파싱되지 않은 경우 수동으로 파싱
+        if not data:
+            try:
+                data = json.loads(request.data)  # 수동으로 JSON 파싱
+            except json.JSONDecodeError:
+                return jsonify({'error': 'Invalid JSON format'}), 400
+
+        print("Received data:", data)  # 수신된 데이터 로그 출력
 
         if not data:
             return jsonify({'error': 'No data received'}), 400
@@ -40,18 +56,22 @@ def webhook():
             'timeInForce': 'GTC'
         }
 
+        # 서명 추가
         params['timestamp'] = str(int(time.time() * 1000))
         params['signature'] = generate_signature(params)
 
+        # 비트겟 API 주문 요청
         order_url = f'{BASE_URL}/api/v1/order'
         response = requests.post(order_url, data=params)
 
+        # 비트겟 API 응답 처리
         if response.status_code == 200:
             return jsonify({'message': 'Order placed successfully'}), 200
         else:
             return jsonify({'error': response.json()}), 500
 
     except Exception as e:
+        print(f"Error: {str(e)}")  # 오류 로그 출력
         return jsonify({'error': str(e)}), 500
 
 # 기본 페이지
@@ -61,4 +81,4 @@ def home():
 
 # 애플리케이션 실행
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)  # 외부에서 접근 가능하도록 host를 0.0.0.0으로 설정
