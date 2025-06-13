@@ -58,7 +58,15 @@ def place_order(signal):
     size = "1.5"
     leverage = "20"
     margin_mode = "isolated"
-    side = 'open_long' if signal == 'buy' else 'open_short'  # 헷지 모드 side
+
+    # 헷지모드일 때 side를 open_long/open_short로!
+    if signal == 'buy':
+        side = 'open_long'
+    elif signal == 'sell':
+        side = 'open_short'
+    else:
+        return {'error': 'Invalid signal'}
+
     timestamp = str(int(time.time() * 1000))
     method = 'POST'
     request_path = '/api/v2/mix/order/place-order'
@@ -70,7 +78,7 @@ def place_order(signal):
         'orderType': 'market',
         'leverage': leverage,
         'marginMode': margin_mode,
-        'positionMode': 'hedge_mode',   # 추가!
+        'positionMode': 'hedge_mode',   # 헷지 모드 필수
         'clientOid': f'entry_{timestamp}',
         'productType': PRODUCT_TYPE
     }
@@ -91,7 +99,6 @@ def place_order(signal):
         error_info = response.json()
         app.logger.error(f"Order placement failed: {response.status_code} {error_info}")
         return {'error': error_info}
-
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
