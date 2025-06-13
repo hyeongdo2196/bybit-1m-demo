@@ -2,24 +2,32 @@ import time
 import hmac
 import hashlib
 import json
+import base64
 import requests
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# 비트겟 API 키와 비밀키
 API_KEY = 'bg_9e4ab5c0a0c427406bba98473752269c'
 API_SECRET = '47a27700c5488fa7fddf508dac0f49472b8cad971087e58503a889d0c3bd3c59'
-PASSPHRASE = 'Hyeongdo2196'  # Passphrase 추가
+PASSPHRASE = 'Hyeongdo2196'
 
 BASE_URL = 'https://api.bitget.com'
 
 # 서명 생성 함수
-def generate_signature(params):
+def generate_signature(params, timestamp):
     """ 비트겟 API 요청 시 필요한 서명 생성 함수 """
+    # 파라미터 문자열 생성
     query_string = '&'.join([f'{key}={value}' for key, value in sorted(params.items())])
-    signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
-    return signature
+    
+    # 서명용 문자열 생성
+    message = f'{timestamp}{query_string}'
+    
+    # HMAC-SHA256 서명 생성
+    signature = hmac.new(API_SECRET.encode(), message.encode(), hashlib.sha256).digest()
+    
+    # Base64 인코딩
+    return base64.b64encode(signature).decode()
 
 # 웹훅 엔드포인트
 @app.route('/webhook', methods=['POST'])
@@ -52,24 +60,36 @@ def webhook():
             'timeInForce': 'GTC'
         }
 
-        # 서명 추가
-        params['timestamp'] = str(int(time.time() * 1000))
-        params['signature'] = generate_signature(params)
+        # 타임스탬프 생성 (밀리초 단위)
+        timestamp = str(int(time.time() * 1000))
+        params['timestamp'] = timestamp
+        
+        # 서명 생성
+        signature = generate_signature(params, timestamp)
+        params['signature'] = signature
 
-        # Passphrase 추가
+        # 헤더 추가
         headers = {
             'Content-Type': 'application/json',
-            'X-BG-API-APIKEY': API_KEY,
-            'X-BG-API-SIGN': params['signature'],
-            'X-BG-API-TIMESTAMP': str(int(time.time() * 1000)),
-            'X-BG-API-PASSPHRASE': PASSPHRASE
+            'ACCESS-KEY': API_KEY,
+            'ACCESS-SIGN': signature,
+            'ACCESS-TIMESTAMP': timestamp,
+            'ACCESS-PASSPHRASE': PASSPHRASE,
+            'locale': 'en-US'  # 예시로 'en-US' 로 설정, 원하시는 언어로 변경 가능
         }
 
         # 비트겟 API 주문 요청
         order_url = f'{BASE_URL}/api/v2/mix/order/place-order'
+        
+        # 로그로 API 요청 파라미터와 헤더를 출력하여 디버깅
+        app.logger.info(f"Params for signature: {params}")
+        app.logger.info(f"Generated signature: {signature}")
+        app.logger.info(f"Request Headers: {headers}")
+
         response = requests.post(order_url, json=params, headers=headers)
 
         # 비트겟 API 응답 처리
+        app.logger.info(f"API Response: {response.status_code} - {response.text}")
         if response.status_code == 200:
             app.logger.info('Order placed successfully')
             return jsonify({'message': 'Order placed successfully'}), 200
