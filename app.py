@@ -82,7 +82,10 @@ def place_order(signal):
     'clientOid': 'entry_168XXXXXXX',
     'productType': 'UMCBL'
 }
-
+    # <=== 이 부분 추가
+    pprint.pprint(body)
+    # <===
+    
     signature = generate_signature(timestamp, method, request_path, body)
     headers = {
         'ACCESS-KEY': API_KEY,
