@@ -45,7 +45,8 @@ def has_open_position(symbol):
         data = response.json().get('data', [])
         if isinstance(data, list) and data:
             position = data[0]
-            # 포지션 보유 여부 판단: open, size 등 상황에 맞게!
+            # 비트겟 포지션 응답에서 size 또는 available, open 등 원하는 값으로 수정 가능
+            # 여기서는 size 기준
             return float(position.get('total', 0)) > 0
         else:
             return False
@@ -57,7 +58,8 @@ def place_order(signal):
     size = "1.5"
     leverage = "20"
     margin_mode = "isolated"
-    side = 'open_long' if signal == 'buy' else 'open_short'
+    # 비트겟 API는 'buy' 또는 'sell'만 허용
+    side = 'buy' if signal == 'buy' else 'sell'
 
     if has_open_position(SYMBOL):
         return {'error': 'Already in position'}
