@@ -1,8 +1,8 @@
 import time
 import hmac
 import hashlib
-import json
 import base64
+import json
 import requests
 from flask import Flask, request, jsonify
 
@@ -17,15 +17,18 @@ BASE_URL = 'https://api.bitget.com'
 # 서명 생성 함수
 def generate_signature(params, timestamp):
     """ 비트겟 API 요청 시 필요한 서명 생성 함수 """
-    # 파라미터 문자열 생성
-    query_string = '&'.join([f'{key}={value}' for key, value in sorted(params.items())])
-    
-    # 서명용 문자열 생성
+    # 파라미터들을 알파벳 순으로 정렬
+    sorted_params = sorted(params.items())
+
+    # 정렬된 파라미터들로 쿼리 문자열 생성
+    query_string = '&'.join([f'{key}={value}' for key, value in sorted_params])
+
+    # 서명용 문자열 생성 (timestamp + 쿼리 문자열)
     message = f'{timestamp}{query_string}'
-    
+
     # HMAC-SHA256 서명 생성
     signature = hmac.new(API_SECRET.encode(), message.encode(), hashlib.sha256).digest()
-    
+
     # Base64 인코딩
     return base64.b64encode(signature).decode()
 
@@ -63,7 +66,7 @@ def webhook():
         # 타임스탬프 생성 (밀리초 단위)
         timestamp = str(int(time.time() * 1000))
         params['timestamp'] = timestamp
-        
+
         # 서명 생성
         signature = generate_signature(params, timestamp)
         params['signature'] = signature
@@ -80,7 +83,7 @@ def webhook():
 
         # 비트겟 API 주문 요청
         order_url = f'{BASE_URL}/api/v2/mix/order/place-order'
-        
+
         # 로그로 API 요청 파라미터와 헤더를 출력하여 디버깅
         app.logger.info(f"Params for signature: {params}")
         app.logger.info(f"Generated signature: {signature}")
