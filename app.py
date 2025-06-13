@@ -71,17 +71,18 @@ def place_order(signal):
     method = 'POST'
     request_path = '/api/v2/mix/order/place-order'
     body = {
-        'symbol': SYMBOL,
-        'marginCoin': MARGIN_COIN,
-        'size': size,
-        'side': side,
-        'orderType': 'market',
-        'leverage': leverage,
-        'marginMode': margin_mode,
-        'positionMode': 'hedge_mode',   # 헷지 모드 필수
-        'clientOid': f'entry_{timestamp}',
-        'productType': PRODUCT_TYPE
-    }
+    'symbol': 'ETHUSDT',
+    'marginCoin': 'USDT',
+    'size': '1.5',
+    'side': 'open_long',            # ← buy신호면 open_long, sell이면 open_short
+    'orderType': 'market',
+    'leverage': '20',
+    'marginMode': 'isolated',
+    'positionMode': 'hedge_mode',
+    'clientOid': 'entry_168XXXXXXX',
+    'productType': 'UMCBL'
+}
+
     signature = generate_signature(timestamp, method, request_path, body)
     headers = {
         'ACCESS-KEY': API_KEY,
