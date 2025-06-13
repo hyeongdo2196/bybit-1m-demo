@@ -1,18 +1,20 @@
-from flask import Flask, request, jsonify
+import time
 import hmac
 import hashlib
-import time
 import json
 import requests
+from flask import Flask, request, jsonify
 
-# Flask 애플리케이션 객체 정의
 app = Flask(__name__)
 
+# 비트겟 API 키와 비밀키
 API_KEY = 'bg_9e4ab5c0a0c427406bba98473752269c'
 API_SECRET = '47a27700c5488fa7fddf508dac0f49472b8cad971087e58503a889d0c3bd3c59'
+PASSPHRASE = 'Hyeongdo2196'  # Passphrase 추가
 
 BASE_URL = 'https://api.bitget.com'
 
+# 서명 생성 함수
 def generate_signature(params):
     """ 비트겟 API 요청 시 필요한 서명 생성 함수 """
     query_string = '&'.join([f'{key}={value}' for key, value in sorted(params.items())])
@@ -51,19 +53,21 @@ def webhook():
         }
 
         # 서명 추가
-        params['timestamp'] = str(int(time.time() * 1000))  # 타임스탬프 추가
-        params['signature'] = generate_signature(params)  # 서명 생성
+        params['timestamp'] = str(int(time.time() * 1000))
+        params['signature'] = generate_signature(params)
 
-        # 서명 파라미터 로그 출력
-        app.logger.info(f"Params for signature: {params}")
-        app.logger.info(f"Generated signature: {params['signature']}")
+        # Passphrase 추가
+        headers = {
+            'Content-Type': 'application/json',
+            'X-BG-API-APIKEY': API_KEY,
+            'X-BG-API-SIGN': params['signature'],
+            'X-BG-API-TIMESTAMP': str(int(time.time() * 1000)),
+            'X-BG-API-PASSPHRASE': PASSPHRASE
+        }
 
         # 비트겟 API 주문 요청
-        order_url = f'{BASE_URL}/api/v2/mix/order/place-order'  # 수정된 엔드포인트
-        response = requests.post(order_url, json=params)  # JSON으로 데이터 보내기
-
-        # API 응답 시 로그 출력
-        app.logger.info(f"API Response: {response.status_code} - {response.text}")
+        order_url = f'{BASE_URL}/api/v2/mix/order/place-order'
+        response = requests.post(order_url, json=params, headers=headers)
 
         # 비트겟 API 응답 처리
         if response.status_code == 200:
