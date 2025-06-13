@@ -17,6 +17,7 @@ BASE_URL = 'https://api.bitget.com'
 # 서명 생성 함수
 def generate_signature(params, timestamp):
     """ 비트겟 API 요청 시 필요한 서명 생성 함수 """
+    
     # 타임스탬프 추가
     params['timestamp'] = timestamp
     
