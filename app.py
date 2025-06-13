@@ -60,7 +60,7 @@ def webhook():
 
         # 비트겟 API 주문 요청
         order_url = f'{BASE_URL}/api/v2/mix/order/place-order'  # 수정된 엔드포인트
-        response = requests.post(order_url, data=params)
+        response = requests.post(order_url, json=params)  # JSON으로 데이터 보내기
 
         # API 응답 시 로그 출력
         app.logger.info(f"API Response: {response.status_code} - {response.text}")
