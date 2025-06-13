@@ -26,7 +26,6 @@ def generate_signature(timestamp, method, request_path, body=None):
 def has_open_position(symbol):
     timestamp = str(int(time.time() * 1000))
     method = 'GET'
-    # 쿼리스트링에 productType 포함
     request_path = (
         f'/api/v2/mix/position/single-position'
         f'?symbol={symbol}&marginCoin={MARGIN_COIN}&productType={PRODUCT_TYPE}'
@@ -43,8 +42,13 @@ def has_open_position(symbol):
     url = BASE_URL + request_path
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
-        data = response.json().get('data', {})
-        return float(data.get('total', 0)) > 0
+        data = response.json().get('data', [])
+        if isinstance(data, list) and data:
+            position = data[0]
+            # 포지션 보유 여부 판단: open, size 등 상황에 맞게!
+            return float(position.get('total', 0)) > 0
+        else:
+            return False
     else:
         app.logger.error(f"Position check failed: {response.status_code} {response.text}")
     return False
@@ -70,7 +74,7 @@ def place_order(signal):
         'leverage': leverage,
         'marginMode': margin_mode,
         'clientOid': f'entry_{timestamp}',
-        'productType': PRODUCT_TYPE  # 이 부분 추가!
+        'productType': PRODUCT_TYPE
     }
     signature = generate_signature(timestamp, method, request_path, body)
     headers = {
