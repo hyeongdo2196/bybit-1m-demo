@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import base64
 import json
+import uuid   # ← 여기 추가!
 import requests
 from flask import Flask, request, jsonify
 
@@ -31,7 +32,6 @@ def has_open_position(symbol):
         f'?symbol={symbol}&marginCoin={MARGIN_COIN}&productType={PRODUCT_TYPE}'
     )
     signature = generate_signature(timestamp, method, request_path)
-
     headers = {
         'ACCESS-KEY': API_KEY,
         'ACCESS-SIGN': signature,
@@ -45,8 +45,6 @@ def has_open_position(symbol):
         data = response.json().get('data', [])
         if isinstance(data, list) and data:
             position = data[0]
-            # 비트겟 포지션 응답에서 size 또는 available, open 등 원하는 값으로 수정 가능
-            # 여기서는 size 기준
             return float(position.get('total', 0)) > 0
         else:
             return False
@@ -54,14 +52,12 @@ def has_open_position(symbol):
         app.logger.error(f"Position check failed: {response.status_code} {response.text}")
     return False
 
-import pprint
-
 def place_order(signal):
+    import pprint
     size = "1.5"
     leverage = "20"
     margin_mode = "isolated"
-
-    # 헷지모드일 때 side를 open_long/open_short로!
+    # 헷지모드에서는 반드시 open_long/open_short!
     if signal == 'buy':
         side = 'open_long'
     elif signal == 'sell':
@@ -69,25 +65,26 @@ def place_order(signal):
     else:
         return {'error': 'Invalid signal'}
 
+    # clientOid를 항상 유니크하게 생성
+    client_oid = f"entry_{uuid.uuid4().hex}"
+
     timestamp = str(int(time.time() * 1000))
     method = 'POST'
     request_path = '/api/v2/mix/order/place-order'
     body = {
-    'symbol': 'ETHUSDT',
-    'marginCoin': 'USDT',
-    'size': '1.5',
-    'side': 'open_long',            # ← buy신호면 open_long, sell이면 open_short
-    'orderType': 'market',
-    'leverage': '20',
-    'marginMode': 'isolated',
-    'positionMode': 'hedge_mode',
-    'clientOid': 'entry_168XXXXXXX',
-    'productType': 'UMCBL'
-}
-    # <=== 이 부분 추가
-    pprint.pprint(body)
-    # <===
-    
+        'symbol': SYMBOL,
+        'marginCoin': MARGIN_COIN,
+        'size': size,
+        'side': side,
+        'orderType': 'market',
+        'leverage': leverage,
+        'marginMode': margin_mode,
+        'positionMode': 'hedge_mode',
+        'clientOid': client_oid,       # ← uuid로 생성!
+        'productType': PRODUCT_TYPE
+    }
+    pprint.pprint(body)  # 주문 바디 실시간 로그
+
     signature = generate_signature(timestamp, method, request_path, body)
     headers = {
         'ACCESS-KEY': API_KEY,
