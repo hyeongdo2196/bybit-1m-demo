@@ -58,7 +58,6 @@ def place_order(signal):
     size = "1.5"
     leverage = "20"
     margin_mode = "isolated"
-    # 비트겟 API는 'buy' 또는 'sell'만 허용
     side = 'buy' if signal == 'buy' else 'sell'
 
     if has_open_position(SYMBOL):
@@ -75,6 +74,7 @@ def place_order(signal):
         'orderType': 'market',
         'leverage': leverage,
         'marginMode': margin_mode,
+        'openType': 'isolated',        # ← 이 부분 추가!
         'clientOid': f'entry_{timestamp}',
         'productType': PRODUCT_TYPE
     }
