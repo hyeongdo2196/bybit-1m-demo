@@ -54,6 +54,8 @@ def has_open_position(symbol):
         app.logger.error(f"Position check failed: {response.status_code} {response.text}")
     return False
 
+import pprint
+
 def place_order(signal):
     size = "1.5"
     leverage = "20"
