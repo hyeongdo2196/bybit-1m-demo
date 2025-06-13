@@ -40,23 +40,22 @@ def webhook():
             app.logger.error(f"Invalid action received: {action}")
             return jsonify({'error': 'Invalid action'}), 400
 
-        # 주문 파라미터 설정
         params = {
             'apiKey': API_KEY,
-            'symbol': data.get('symbol', 'BTCUSDT'),  # 기본값 BTCUSDT
-            'price': data.get('price', '30000'),      # 기본값 30000
-            'quantity': data.get('quantity', '0.01'), # 기본값 0.01
-            'side': 'buy' if action == 'buy' else 'sell',  # 'buy' 또는 'sell'
-            'type': 'limit',  # 한정가 주문
-            'timeInForce': 'GTC'  # GTC(지속적 주문)
+            'symbol': data.get('symbol', 'BTCUSDT'),
+            'price': data.get('price', '30000'),
+            'quantity': data.get('quantity', '0.01'),
+            'side': 'buy' if action == 'buy' else 'sell',
+            'type': 'limit',
+            'timeInForce': 'GTC'
         }
 
         # 서명 추가
-        params['timestamp'] = str(int(time.time() * 1000))  # 타임스탬프 추가
-        params['signature'] = generate_signature(params)  # 서명 생성
+        params['timestamp'] = str(int(time.time() * 1000))
+        params['signature'] = generate_signature(params)
 
         # 비트겟 API 주문 요청
-        order_url = f'{BASE_URL}/api/mix/v1/order/placeOrder'  # 수정된 엔드포인트
+        order_url = f'{BASE_URL}/api/v2/mix/order/place-order'  # 엔드포인트를 v2로 변경
         response = requests.post(order_url, data=params)
 
         # 비트겟 API 응답 처리
