@@ -3,7 +3,7 @@ import hmac
 import hashlib
 import base64
 import json
-import uuid   # ← 여기 추가!
+import uuid
 import requests
 from flask import Flask, request, jsonify
 
@@ -14,9 +14,16 @@ API_SECRET = '47a27700c5488fa7fddf508dac0f49472b8cad971087e58503a889d0c3bd3c59'
 PASSPHRASE = 'Hyeongdo2196'
 BASE_URL = 'https://api.bitget.com'
 
-SYMBOL = 'ETHUSDT'
 MARGIN_COIN = 'USDT'
 PRODUCT_TYPE = 'UMCBL'   # USDT 무기한
+
+# 심볼별 최소 주문 수량(원하는 심볼 추가)
+SYMBOL_MIN_SIZE = {
+    'BTCUSDT': "0.001",
+    'ETHUSDT': "0.01",
+    'SOLUSDT': "1",
+    # 필요시 다른 심볼도 추가
+}
 
 def generate_signature(timestamp, method, request_path, body=None):
     body_str = json.dumps(body) if body else ''
@@ -52,27 +59,22 @@ def has_open_position(symbol):
         app.logger.error(f"Position check failed: {response.status_code} {response.text}")
     return False
 
-def place_order(signal):
+def place_order(signal, symbol='BTCUSDT'):
     import pprint
-    size = "1.5"
+    size = SYMBOL_MIN_SIZE.get(symbol, "0.01")  # 심볼별 최소 수량 사용, 기본값 0.01
     leverage = "20"
     margin_mode = "isolated"
-    # 헷지모드에서는 반드시 open_long/open_short!
-    if signal == 'buy':
-        side = 'open_long'
-    elif signal == 'sell':
-        side = 'open_short'
-    else:
-        return {'error': 'Invalid signal'}
-
-    # clientOid를 항상 유니크하게 생성
+    side = 'open_long' if signal == 'buy' else 'open_short'
     client_oid = f"entry_{uuid.uuid4().hex}"
+
+    if has_open_position(symbol):
+        return {'error': 'Already in position'}
 
     timestamp = str(int(time.time() * 1000))
     method = 'POST'
     request_path = '/api/v2/mix/order/place-order'
     body = {
-        'symbol': SYMBOL,
+        'symbol': symbol,
         'marginCoin': MARGIN_COIN,
         'size': size,
         'side': side,
@@ -80,10 +82,10 @@ def place_order(signal):
         'leverage': leverage,
         'marginMode': margin_mode,
         'positionMode': 'hedge_mode',
-        'clientOid': client_oid,       # ← uuid로 생성!
-        'productType': PRODUCT_TYPE
+        'productType': PRODUCT_TYPE,
+        'clientOid': client_oid
     }
-    pprint.pprint(body)  # 주문 바디 실시간 로그
+    pprint.pprint(body)  # 실제 전송되는 body 확인용
 
     signature = generate_signature(timestamp, method, request_path, body)
     headers = {
@@ -110,10 +112,11 @@ def webhook():
         app.logger.info(f"Webhook received: {data}")
 
         signal = data.get('signal')
+        symbol = data.get('symbol', 'BTCUSDT')  # webhook에서 symbol도 전달받음
         if signal not in ['buy', 'sell']:
             return jsonify({'error': 'Invalid signal'}), 400
 
-        result = place_order(signal)
+        result = place_order(signal, symbol)
         status_code = 200 if 'message' in result else 500
         return jsonify(result), status_code
 
