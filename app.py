@@ -9,8 +9,8 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 # !!! 여기에 본인의 Bybit API 정보를 넣으세요 !!!
-API_KEY = 'YOUR_BYBIT_API_KEY'
-API_SECRET = 'YOUR_BYBIT_API_SECRET'
+API_KEY = '2YJXLH8Gn8ojlPlfOa'
+API_SECRET = '1BrU7sTCYtuKy1GRHcbwr5Xx3HixkKH8sr22'
 BASE_URL = 'https://api.bybit.com'
 
 # 심볼별 최소 주문 수량 (Bybit 기준, 필요시 추가)
