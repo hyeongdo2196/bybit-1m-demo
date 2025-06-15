@@ -1,109 +1,102 @@
 import time
 import hmac
 import hashlib
-import base64
+import requests
 import json
 import uuid
-import requests
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-API_KEY = 'bg_9e4ab5c0a0c427406bba98473752269c'
-API_SECRET = '47a27700c5488fa7fddf508dac0f49472b8cad971087e58503a889d0c3bd3c59'
-PASSPHRASE = 'Hyeongdo2196'
-BASE_URL = 'https://api.bitget.com'
+# !!! 여기에 본인의 Bybit API 정보를 넣으세요 !!!
+API_KEY = 'YOUR_BYBIT_API_KEY'
+API_SECRET = 'YOUR_BYBIT_API_SECRET'
+BASE_URL = 'https://api.bybit.com'
 
-MARGIN_COIN = 'USDT'
-PRODUCT_TYPE = 'UMCBL'   # USDT 무기한
-
-# 심볼별 최소 주문 수량(원하는 심볼 추가)
-SYMBOL_MIN_SIZE = {
-    'BTCUSDT': "0.001",
-    'ETHUSDT': "0.01",
-    'SOLUSDT': "1",
-    # 필요시 다른 심볼도 추가
+# 심볼별 최소 주문 수량 (Bybit 기준, 필요시 추가)
+SYMBOL_MIN_QTY = {
+    'BTCUSDT': 0.001,
+    'ETHUSDT': 0.01,
+    'SOLUSDT': 0.1,
+    # 추가 원할 경우 여기에...
 }
 
-def generate_signature(timestamp, method, request_path, body=None):
-    body_str = json.dumps(body) if body else ''
-    message = f'{timestamp}{method.upper()}{request_path}{body_str}'
-    digest = hmac.new(API_SECRET.encode('utf-8'), message.encode('utf-8'), hashlib.sha256).digest()
-    return base64.b64encode(digest).decode()
+def get_timestamp():
+    # Bybit는 millisecond timestamp 사용
+    return str(int(time.time() * 1000))
+
+def generate_signature(params, api_secret):
+    # Bybit V5 REST API 시그니처
+    sorted_params = '&'.join([f"{k}={params[k]}" for k in sorted(params)])
+    return hmac.new(api_secret.encode('utf-8'), sorted_params.encode('utf-8'), hashlib.sha256).hexdigest()
+
+def http_request(method, endpoint, params):
+    ts = get_timestamp()
+    params['api_key'] = API_KEY
+    params['timestamp'] = ts
+    params['recvWindow'] = 5000  # 5초
+    sign = generate_signature(params, API_SECRET)
+    params['sign'] = sign
+
+    if method == "GET":
+        resp = requests.get(BASE_URL + endpoint, params=params)
+    else:
+        resp = requests.post(BASE_URL + endpoint, data=params)
+    return resp
 
 def has_open_position(symbol):
-    timestamp = str(int(time.time() * 1000))
-    method = 'GET'
-    request_path = (
-        f'/api/v2/mix/position/single-position'
-        f'?symbol={symbol}&marginCoin={MARGIN_COIN}&productType={PRODUCT_TYPE}'
-    )
-    signature = generate_signature(timestamp, method, request_path)
-    headers = {
-        'ACCESS-KEY': API_KEY,
-        'ACCESS-SIGN': signature,
-        'ACCESS-TIMESTAMP': timestamp,
-        'ACCESS-PASSPHRASE': PASSPHRASE,
-        'locale': 'en-US'
+    # Bybit 포지션 조회 (0이 아니면 포지션 있음)
+    endpoint = '/v5/position/list'
+    params = {
+        "category": "linear",  # USDT Perp
+        "symbol": symbol,
     }
-    url = BASE_URL + request_path
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        data = response.json().get('data', [])
-        if isinstance(data, list) and data:
-            position = data[0]
-            return float(position.get('total', 0)) > 0
-        else:
-            return False
-    else:
-        app.logger.error(f"Position check failed: {response.status_code} {response.text}")
-    return False
+    resp = http_request('GET', endpoint, params)
+    try:
+        data = resp.json()
+        if data['retCode'] == 0:
+            pos_list = data['result']['list']
+            for pos in pos_list:
+                size = float(pos.get('size', 0))
+                if size != 0:
+                    return True
+        return False
+    except Exception as e:
+        app.logger.error(f"Position check error: {str(e)} - {resp.text}")
+        return False
 
 def place_order(signal, symbol='BTCUSDT'):
-    import pprint
-    size = SYMBOL_MIN_SIZE.get(symbol, "0.01")  # 심볼별 최소 수량 사용, 기본값 0.01
-    leverage = "20"
-    margin_mode = "isolated"
-    side = 'open_long' if signal == 'buy' else 'open_short'
-    client_oid = f"entry_{uuid.uuid4().hex}"
+    qty = SYMBOL_MIN_QTY.get(symbol, 0.01)
+    side = 'Buy' if signal == 'buy' else 'Sell'
+    order_type = 'Market'
+    client_order_id = f"entry_{uuid.uuid4().hex}"
 
     if has_open_position(symbol):
         return {'error': 'Already in position'}
 
-    timestamp = str(int(time.time() * 1000))
-    method = 'POST'
-    request_path = '/api/v2/mix/order/place-order'
-    body = {
+    endpoint = '/v5/order/create'
+    params = {
+        'category': 'linear',
         'symbol': symbol,
-        'marginCoin': MARGIN_COIN,
-        'size': size,
         'side': side,
-        'orderType': 'market',
-        'leverage': leverage,
-        'marginMode': margin_mode,
-        'positionMode': 'hedge_mode',
-        'productType': PRODUCT_TYPE,
-        'clientOid': client_oid
+        'orderType': order_type,
+        'qty': qty,
+        'positionIdx': 0,  # 0: BOTH, 1: LONG, 2: SHORT
+        'reduceOnly': False,
+        'closeOnTrigger': False,
+        'timeInForce': 'IOC',  # 즉시체결
+        'orderLinkId': client_order_id
+        # 필요시 leverage, takeProfit 등 추가 가능
     }
-    pprint.pprint(body)  # 실제 전송되는 body 확인용
-
-    signature = generate_signature(timestamp, method, request_path, body)
-    headers = {
-        'ACCESS-KEY': API_KEY,
-        'ACCESS-SIGN': signature,
-        'ACCESS-TIMESTAMP': timestamp,
-        'ACCESS-PASSPHRASE': PASSPHRASE,
-        'Content-Type': 'application/json',
-        'locale': 'en-US'
-    }
-    url = BASE_URL + request_path
-    response = requests.post(url, headers=headers, json=body)
-    if response.status_code == 200:
-        return {'message': 'Order placed'}
-    else:
-        error_info = response.json()
-        app.logger.error(f"Order placement failed: {response.status_code} {error_info}")
-        return {'error': error_info}
+    resp = http_request('POST', endpoint, params)
+    try:
+        data = resp.json()
+        if data['retCode'] == 0:
+            return {'message': 'Order placed'}
+        else:
+            return {'error': data}
+    except Exception as e:
+        return {'error': str(e)}
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -112,21 +105,20 @@ def webhook():
         app.logger.info(f"Webhook received: {data}")
 
         signal = data.get('signal')
-        symbol = data.get('symbol', 'BTCUSDT')  # webhook에서 symbol도 전달받음
+        symbol = data.get('symbol', 'BTCUSDT')
         if signal not in ['buy', 'sell']:
             return jsonify({'error': 'Invalid signal'}), 400
 
         result = place_order(signal, symbol)
         status_code = 200 if 'message' in result else 500
         return jsonify(result), status_code
-
     except Exception as e:
         app.logger.error(f"Unhandled error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/')
 def home():
-    return 'Bitget Flask Trading Bot is running!'
+    return 'Bybit Flask Trading Bot is running!'
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
